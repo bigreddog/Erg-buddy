@@ -1,0 +1,44 @@
+// Run against a local server and Chromium started with --remote-debugging-port=9222.
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+const pages = await (await fetch('http://127.0.0.1:9222/json')).json();
+const ws = new WebSocket(pages.find(p=>p.type==='page').webSocketDebuggerUrl);
+await new Promise(resolve=>ws.addEventListener('open',resolve,{once:true}));
+let seq=0; const pending=new Map(), errors=[];
+ws.addEventListener('message',e=>{const data=JSON.parse(e.data);if(data.id){const p=pending.get(data.id);pending.delete(data.id);data.error?p.reject(new Error(JSON.stringify(data.error))):p.resolve(data.result);}else if(data.method==='Runtime.exceptionThrown')errors.push(data.params.exceptionDetails.text+' '+(data.params.exceptionDetails.exception?.description||''));});
+const call=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
+const evaluate=async expression=>{const r=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const click=id=>evaluate(`document.getElementById(${JSON.stringify(id)}).click()`);
+const value=id=>evaluate(`document.getElementById(${JSON.stringify(id)}).textContent`);
+try {
+  await call('Runtime.enable'); await call('Page.enable');
+  await call('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+  await call('Page.navigate',{url:'http://127.0.0.1:8080'});await sleep(700);
+  await evaluate('localStorage.clear()');await call('Page.reload');await sleep(400);
+  assert.equal(await evaluate('document.title'),'Erg Buddy · Find your rhythm');
+  assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
+  await evaluate('window.originalSetTimeout=window.setTimeout;window.setTimeout=(fn,delay,...args)=>originalSetTimeout(fn,Math.min(delay,25),...args)');
+  await click('demo');await sleep(250);assert.equal(await value('connection'),'DEMO DATA');assert.notEqual(await value('score'),'—');
+  await click('record');await sleep(300);const count=Number(await value('strokes'));assert.ok(count>=8);
+  await click('record');await sleep(120);assert.equal(Number(await value('strokes')),count);assert.equal(await value('recording-badge'),'Paused');
+  await click('record');await sleep(120);assert.ok(Number(await value('strokes'))>count);
+  await click('end');const sessions=await evaluate('JSON.parse(localStorage.getItem("erg-buddy-sessions"))');assert.equal(sessions.length,1);assert.equal(sessions[0].source,'demo');assert.ok(sessions[0].duration>0);assert.ok(sessions[0].strokes.length>count);
+  await evaluate('window.downloads=[];URL.createObjectURL=blob=>{downloads.push(blob);return "blob:verification"};HTMLAnchorElement.prototype.click=function(){}');
+  await click('export');const exported=await evaluate('downloads[0].text().then(JSON.parse)');assert.equal(exported.source,'demo');assert.equal(exported.strokes.length,sessions[0].strokes.length);
+  await evaluate('document.querySelector(".saved-session button:last-child").click()');assert.ok((await evaluate('downloads[1].text()')).startsWith('# Erg Buddy demo session'));
+  await mkdir('verification-results',{recursive:true});
+  const shot=async name=>{const r=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});await writeFile(`verification-results/${name}.png`,Buffer.from(r.data,'base64'));};
+  await shot('phone');await click('focus');assert.equal(await evaluate('document.body.classList.contains("focus")'),true);await shot('phone-focus');await click('focus');
+  await call('Emulation.setDeviceMetricsOverride',{width:844,height:390,deviceScaleFactor:1,mobile:true});assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);await shot('landscape');
+  await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});await shot('desktop');
+  await click('demo');assert.equal(await value('connection'),'OFFLINE');
+  await evaluate(`window.mockChars={};window.mockDevice=new EventTarget();mockDevice.name='PM5 Test';mockDevice.gatt={connected:true,connect:async()=>({getPrimaryService:async()=>({getCharacteristic:async id=>{const c=new EventTarget();c.startNotifications=async()=>{};mockChars[id.slice(6,8)]=c;return c;}})}),disconnect(){this.connected=false;mockDevice.dispatchEvent(new Event('gattserverdisconnected'));}};Object.defineProperty(navigator,'bluetooth',{configurable:true,value:{requestDevice:async()=>mockDevice}});window.emit=(type,buffer)=>{const c=mockChars[type];c.value=new DataView(buffer);c.dispatchEvent(new Event('characteristicvaluechanged'));}`);
+  await click('connect');await sleep(100);assert.equal(await value('connection'),'PM5 CONNECTED');await click('record');
+  await evaluate(`for(let n=1;n<=10;n++){let v=new DataView(new ArrayBuffer(16));v.setUint8(5,20);v.setUint8(6,255);v.setUint16(7,12000,true);emit('32',v.buffer);v=new DataView(new ArrayBuffer(20));v.setUint16(0,n*300,true);v.setUint16(3,n*120,true);v.setUint8(6,130);v.setUint8(7,100);v.setUint16(8,200,true);v.setUint16(10,1200,true);v.setUint16(16,4500,true);v.setUint16(18,n,true);emit('35',v.buffer);}`);
+  assert.equal(await value('strokes'),'10');assert.equal(await value('hr'),'—');assert.equal(await value('score'),'100');
+  await evaluate('mockDevice.gatt.disconnect()');assert.equal(await value('connection'),'OFFLINE');
+  const live=await evaluate('JSON.parse(localStorage.getItem("erg-buddy-sessions"))[0]');assert.equal(live.source,'PM5');assert.equal(live.strokes.length,10);
+  await call('Page.reload');await sleep(400);assert.equal(await evaluate('document.querySelectorAll(".saved-session").length'),2);
+  assert.deepEqual(errors,[]);console.log('Browser checks passed: mobile/landscape/desktop layout, demo coaching, pause/resume, storage, JSON download, focus view, mocked PM5 telemetry and disconnect, reload persistence.');
+} finally { ws.close(); }
