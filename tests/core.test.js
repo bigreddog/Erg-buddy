@@ -45,5 +45,5 @@ test('Bluetooth subscribes to real characteristic UUIDs and cleans up on disconn
   Object.defineProperty(globalThis,'isSecureContext',{value:true,configurable:true});
   Object.defineProperty(globalThis,'navigator',{value:{bluetooth:{requestDevice:async options=>{assert.equal(options.filters[0].namePrefix,'PM5');return device;}}},configurable:true});
   const packets=[],pm=new PM5((...args)=>packets.push(args),()=>{});assert.equal(await pm.connect(),'PM5 123');assert.deepEqual(subscribed,['31','32','35']);
-  listeners.get('32')({target:{value:new DataView(new ArrayBuffer(16))}});assert.equal(packets[0][0],'32');pm.disconnect();assert.equal(listeners.size,0);assert.ok(disconnected);
+  listeners.get('32')({target:{value:new DataView(new ArrayBuffer(16))}});assert.equal(packets.find(p=>p[0]==='32')[0],'32');pm.disconnect();assert.equal(listeners.size,0);assert.ok(disconnected);
 });

@@ -13,7 +13,7 @@ export class Recording {
   finish() {
     if (!this.strokes.length) return null;
     const first = this.strokes[0], last = this.strokes.at(-1);
-    return { version: this.version, source: this.source, settings: this.settings, startedAt: this.startedAt, endedAt: new Date().toISOString(), duration: this.strokes.reduce((sum,s) => sum + s.drive + s.recovery,0), distance: this.strokes.reduce((sum,s) => sum + s.strokeDistance,0), monitorElapsedSpan: Math.max(0,last.elapsed - first.elapsed), strokes: this.strokes };
+    return { version: this.version, source: this.source, settings: this.settings, startedAt: this.startedAt, endedAt: new Date().toISOString(), duration: this.strokes.reduce((sum,s) => sum + s.drive + s.recovery,0), distance: this.strokes.reduce((sum,s) => sum + s.strokeDistance,0), monitorElapsedSpan: Math.max(0,last.elapsed - first.elapsed), strokes: this.strokes, forceCurves: this.curves || [] };
   }
 }
 export function csv(session) {
