@@ -16,11 +16,11 @@ export function analyse(strokes, { targetRate = 22, targetRatio = 2 } = {}) {
   const consistency = Math.max(0, 100 - (workCV * 0.5 + timingCV * 0.3 + lengthCV * 0.2) * 400);
   const rhythm = Math.max(0, 100 - Math.abs(ratio - targetRatio) / targetRatio * 80);
   const score = Math.round(consistency * 0.7 + rhythm * 0.3);
-  let title = 'Keep that rhythm', cue = 'Repeat this effort. Keep the drive connected and the recovery relaxed.';
-  if (ratio < targetRatio * 0.8) { title = 'Give the recovery time'; cue = 'Let the handle move away, hinge forward, then slide. Try a little more recovery time at the same effort.'; }
-  else if (workCV > 0.12) { title = 'Make each drive repeatable'; cue = 'Your work per stroke is varying. Try matching the pressure on the next few drives.'; }
-  else if (lengthCV > 0.08) { title = 'Repeat your stroke length'; cue = 'The monitor reports changing drive length. Aim for a comfortable, repeatable reach; avoid forcing extra length.'; }
-  else if (Math.abs(rate - targetRate) > 2) { title = rate > targetRate ? 'Ease the stroke rate' : 'Lift the stroke rate gently'; cue = `Aim for ${targetRate} spm. Adjust the recovery gradually while keeping the drive controlled.`; }
-  else if (ratio > targetRatio * 1.25) { title = 'Bring the rhythm together'; cue = 'Your recovery is longer than your chosen target. Bring it in gently if that suits this session.'; }
+  let title = 'Keep that rhythm', cue = 'Keep the drive connected and the recovery relaxed.';
+  if (ratio < targetRatio * 0.8) { title = 'Give the recovery time'; cue = 'Hands away, body forward, then slide. Give the recovery more time.'; }
+  else if (workCV > 0.12) { title = 'Repeat each drive'; cue = 'Match the pressure on your next few drives.'; }
+  else if (lengthCV > 0.08) { title = 'Match stroke length'; cue = 'Aim for a comfortable, repeatable reach. Avoid forcing extra length.'; }
+  else if (Math.abs(rate - targetRate) > 2) { title = rate > targetRate ? 'Ease the rate' : 'Lift the rate'; cue = `Aim for ${targetRate} spm. Adjust the recovery; keep the drive controlled.`; }
+  else if (ratio > targetRatio * 1.25) { title = 'Balance the rhythm'; cue = 'Ease the recovery toward your target, if it suits this session.'; }
   return { score, consistency: Math.round(consistency), rhythm: Math.round(rhythm), ratio, rate, workCV, lengthCV, timingCV, title, cue, sample: window.length };
 }

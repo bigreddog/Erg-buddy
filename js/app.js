@@ -12,7 +12,7 @@ let mode = 'offline', connecting = false, demoTimer = null, demoCount = 0, demoE
 let live = {}, metricTime = 0, packetTime = 0, strokeTime = 0, windowStrokes = [], lastStroke = null, recording = null, saved = [], lastSpoken = 0, lastCue = '', wakeLock = null;
 const rower = new RowerView($('rower-canvas'), phase => show('animation-phase',phase), message => { show('rower-error',message); $('rower-error').hidden=false; });
 sessionScreens(name => { rower.visible=name==='rower'; if(rower.visible)rower.size(); });
-let noticeTimer, curveTime=0, hrHistory=[], lastHRTime=0;
+let noticeTimer, curveTime=0, hrHistory=[], lastHRTime=0, curveDiagnostics=null;
 const mirror = (key,value) => document.querySelectorAll(`[data-metric="${key}"]`).forEach(node => { node.textContent=value; });
 const settings = () => ({ targetRate: Number($('target-rate').value), targetRatio: Number($('target-ratio').value) });
 function notice(message, error = false) { show('notice', message); $('notice').classList.toggle('error', error); $('notice').hidden=false; show('connection-help',message); clearTimeout(noticeTimer); noticeTimer=setTimeout(()=>{$('notice').hidden=true;},error?10000:5000); }
@@ -27,6 +27,7 @@ async function acquireWakeLock() {
 }
 function setMode(next) {
   mode = next;
+  if(next==='demo'){curveDiagnostics=null;show('curve-diagnostics','Demo session — no Bluetooth diagnostics.');}
   show('animation-source',next==='demo'?'Simulated stroke timing':next==='PM5'?'Live PM5 stroke phase':'Connect PM5 or try the demo');
   show('connection', next === 'demo' ? 'DEMO DATA' : next === 'PM5' ? 'PM5 CONNECTED' : 'OFFLINE');
   show('source', next === 'offline' ? ' · No data source' : ` · ${next === 'demo' ? 'Simulated data' : 'Live PM5 data'}`);
@@ -43,7 +44,7 @@ function paint() {
   const fresh = mode === 'demo' || Date.now() - metricTime < 5000;
   const pace=fresh ? split(live.pace) : '—:—'; show('pace',pace); mirror('pace',pace);
   for (const k of ['rate','power','hr']) { const value=fresh ? num(live[k]) : '—'; show(k,value); mirror(k,value); }
-  show('hr-status',fresh && Number.isFinite(live.hr)?(mode==='demo'?'Simulated HR · demo session':'Live HR via PM5'):'Pair a heart-rate sensor to your PM5.');
+  show('hr-status',fresh && Number.isFinite(live.hr)?(mode==='demo'?'Demo HR':'PM5 sensor'):'Pair sensor to PM5');
   show('drag', num(live.drag));
 }
 function paintStroke(s) {
@@ -109,6 +110,12 @@ function paintHR() {
   $('hr-line').setAttribute('d',path);
 }
 function packet(type, data) {
+  if(type==='curve-diagnostics'){
+    curveDiagnostics=structuredClone(data);
+    const current=recording||pausedRecording;if(current)current.curveDiagnostics=structuredClone(data);
+    show('curve-diagnostics',JSON.stringify(data,null,2));
+    return;
+  }
   if(type==='curve-status'){show('curve-status',data.message);return;}
   if(type==='curve'){paintCurve(data.samples,mode);if(recording){recording.curves??=[];recording.curves.push({receivedAt:new Date().toISOString(),samples:data.samples});}return;}
   if(type==='error'){notice(data.message,true);return;}
@@ -160,7 +167,7 @@ $('demo').addEventListener('click', () => {
 let pausedRecording = null;
 $('record').addEventListener('click', () => {
   if (recording) { pausedRecording = recording; recording = null; show('record','Resume recording'); show('recording-badge','Paused'); $('end').disabled = false; }
-  else { recording = pausedRecording || new Recording(mode, settings()); pausedRecording = null; paintRecording(); acquireWakeLock(); }
+  else { recording = pausedRecording || new Recording(mode, settings()); if(mode==='PM5')recording.curveDiagnostics=structuredClone(curveDiagnostics); pausedRecording = null; paintRecording(); acquireWakeLock(); }
 });
 function finishRecording() {
   const current = recording || pausedRecording;

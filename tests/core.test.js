@@ -29,7 +29,7 @@ test('consistent rhythm gets a high rating; a rushed recovery produces a relevan
   const rushed=stable.map(s=>({...s,recovery:1}));const a=analyse(rushed);assert.ok(a.score<100);assert.equal(a.title,'Give the recovery time');
 });
 test('variable work lowers consistency and cues repeatable pressure',()=>{
-  const varied=Array.from({length:12},(_,i)=>stroke(i+1,{work:i%2?300:600}));const a=analyse(varied);assert.ok(a.consistency<70);assert.equal(a.title,'Make each drive repeatable');
+  const varied=Array.from({length:12},(_,i)=>stroke(i+1,{work:i%2?300:600}));const a=analyse(varied);assert.ok(a.consistency<70);assert.equal(a.title,'Repeat each drive');
 });
 test('recording deduplicates strokes and rejects a reset',()=>{
   const r=new Recording('PM5',{});assert.equal(r.add(stroke(1)),true);assert.equal(r.add(stroke(1)),false);assert.equal(r.add(stroke(2)),true);assert.equal(r.add(stroke(1)), 'reset');assert.equal(r.strokes.length,2);
