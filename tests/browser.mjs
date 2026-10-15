@@ -20,6 +20,17 @@ try {
   assert.equal(await evaluate('document.title'),'Erg Buddy · Find your rhythm');
   assert.equal(await evaluate('document.getElementById("rower-error").hidden'),true);
   assert.ok(await evaluate('document.getElementById("rower-canvas").width > 0'));
+  const selected=()=>evaluate(`document.querySelector('[role="tab"][aria-selected="true"]').id`);
+  assert.equal(await value('cycle-label'),'Pause · 5s');
+  await sleep(5100);assert.equal(await selected(),'tab-coach');
+  await click('screen-cycle');assert.equal(await value('cycle-label'),'Play · 5s');
+  await sleep(5100);assert.equal(await selected(),'tab-coach');
+  await click('tab-workout');await click('screen-cycle');
+  await sleep(3000);await click('tab-rower');await sleep(2200);assert.equal(await selected(),'tab-rower');
+  await sleep(3000);assert.equal(await selected(),'tab-coach');
+  await click('tools');await sleep(5100);assert.equal(await selected(),'tab-coach');
+  await click('close-tools');await click('screen-cycle');assert.equal(await value('cycle-label'),'Play · 5s');
+  await click('tab-rower');
   await click('tools');assert.equal(await evaluate('document.getElementById("settings-dialog").open'),true);
   await click('demo');assert.equal(await evaluate('document.getElementById("settings-dialog").open'),false);
   assert.equal(await value('connection'),'DEMO DATA');
@@ -41,6 +52,7 @@ try {
     for(const tab of ['rower','coach','workout']) {
       await click(`tab-${tab}`);await sleep(90);
       const layout=await evaluate(`(()=>{const s=document.querySelector('.screen:not([hidden])');return {page:document.documentElement.scrollWidth<=innerWidth && document.documentElement.scrollHeight<=innerHeight,screen:s.scrollHeight<=s.clientHeight+1 && s.scrollWidth<=s.clientWidth+1,overflow:[...s.querySelectorAll('article')].map(a=>[a.className,a.scrollHeight,a.clientHeight]).filter(a=>a[1]>a[2]+1)}})()`);
+      assert.equal(await evaluate(`(()=>{const r=document.getElementById('screen-cycle').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight;})()`),true);
       assert.equal(layout.page,true,`${width}x${height} ${tab} page overflow`);assert.equal(layout.screen,true,`${width}x${height} ${tab} screen overflow`);assert.deepEqual(layout.overflow,[],`${width}x${height} ${tab} content clipping`);
       if(width===844||width===640)await shot(`${width}-${tab}`);
     }
@@ -63,5 +75,5 @@ try {
   await evaluate('mockDevice.gatt.disconnect()');assert.equal(await value('connection'),'OFFLINE');
   const live=await evaluate('JSON.parse(localStorage.getItem("erg-buddy-sessions"))[0]');assert.equal(live.source,'PM5');assert.equal(live.strokes.length,10);assert.equal(live.forceCurves[0].samples.length,15);
   await call('Page.reload');await sleep(500);assert.equal(await evaluate('document.querySelectorAll(".saved-session").length'),2);
-  assert.deepEqual(errors,[]);console.log('Browser checks passed: six landscape sizes, no page scrolling or card clipping on all three screens, WebGL rower, native touch swipes and keyboard tabs, demo/live phase animation, measured fragmented CSAFE curve, HR, recording/export and saved sessions.');
+  assert.deepEqual(errors,[]);console.log('Browser checks passed: default five-second cycling, pause/play, manual countdown reset, settings suspension, six landscape sizes, no page scrolling or card clipping on all three screens, WebGL rower, native touch swipes and keyboard tabs, demo/live phase animation, measured fragmented CSAFE curve, HR, recording/export and saved sessions.');
 } finally { ws.close(); }
